@@ -1,0 +1,61 @@
+service: manage-backtest-jobs
+frameworkVersion: '3'
+plugins:
+  - serverless-python-requirements
+package:
+  patterns:
+    - '!node_modules/**'
+provider:
+  name: aws
+  runtime: python3.8
+  region: us-west-2
+  timeout: 180
+  memorySize: 512
+  deploymentBucket:
+    name: cointosis
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+      - sqs:ReceiveMesssage
+      - sqs:DeleteMessage
+      - sqs:SendMessage
+      - sqs:GetQueueAttributes
+      - sqs:GetQueueUrl
+      - sqs:ListQueues
+      Resource:
+      - arn:aws:sqs:us-west-2:043337637715:fx-backtest-requests
+      - arn:aws:sqs:us-west-2:043337637715:fx-get-backtest-prices
+      - arn:aws:sqs:us-west-2:043337637715:fx-get-backtest-indicators
+      - arn:aws:sqs:us-west-2:043337637715:fx-manage-backtest-errors
+    - Effect: Allow
+      Action:
+      - ssm:*
+      Resource:
+      - arn:aws:ssm:us-west-2:043337637715:*
+    - Effect: Allow
+      Action:
+      - s3:Get*
+      - s3:List*
+      - s3-object-lambda:Get*
+      - s3-object-lambda:List*
+      Resource:
+      - arn:aws:s3:::cointosis-backtest/*
+      - arn:aws:s3:::cointosis-backtest
+functions:
+  main:
+    handler: handler.manage_backtest
+    description: Lambda to handle backtest request jobs
+    vpc:
+      subnetIds:
+        - subnet-007fff0fe13c09852
+      securityGroupIds:
+        - sg-0c672969f3a1a27b8
+    events:
+      - sqs: arn:aws:sqs:us-west-2:043337637715:fx-backtest-requests
+    tags:
+      BusinessUnit: Cointosis
+      Owner: tobiah.rex@gmail.com
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    zip: true

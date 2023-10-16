@@ -34,7 +34,7 @@ Requires an OpenAI API key:
  - Go to https://openai.com/api/ and Log in
  - Go to https://beta.openai.com/account/api-keys
  - Create a new secret key
- 
+
 This OPENAI_API_KEY should be set as an environment variable:
 `export OPENAI_API_KEY=<your OpenAI API key>`
 

@@ -2,3 +2,4 @@ openai
 transformers
 pdfminer
 html2text
+python-dotenv

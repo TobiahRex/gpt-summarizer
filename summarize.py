@@ -20,22 +20,25 @@ This script was written by ChatGPT with direction by Scott Leibrand,
 then edited by Scott Leibrand w/ CoPilot and ChatGPT.
 """
 
+import html2text
+from pdfminer.pdfpage import PDFPage
+from pdfminer.layout import LAParams
+from pdfminer.converter import TextConverter
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from io import StringIO
+from transformers import GPT2TokenizerFast
 import sys
 import re
 import os
 import openai
 import glob
+from dotenv import load_dotenv
 
-#import tiktoken
-from transformers import GPT2TokenizerFast
+load_dotenv()  # This will load the environment variables from the .env file
 
-from io import StringIO
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.converter import TextConverter
-from pdfminer.layout import LAParams
-from pdfminer.pdfpage import PDFPage
 
-import html2text
+# import tiktoken
+
 
 def extract_text_from_pdf(pdf_path):
     """Extracts the text from a PDF file and returns it as a string.
@@ -75,6 +78,7 @@ def extract_text_from_pdf(pdf_path):
 
     return text
 
+
 def split_into_sections(text):
     """Splits a string of text into a list of tuples, where each tuple contains a section header and the corresponding text.
 
@@ -92,7 +96,7 @@ def split_into_sections(text):
         text = text[:match.start()]
 
     # Use a regular expression to split the text into sections
-    #pattern = r'\n\n(\d+[\.:]\s+[^\n]+)\n\n'
+    # pattern = r'\n\n(\d+[\.:]\s+[^\n]+)\n\n'
     # Match section headers that start with a number followed by a period or colon,
     # or markdown-style headers that start with one to six hash marks followed by a space
     pattern = r'\n\n(#+\s+[^\n]+|\d+[\.:]\s+[^\n]+)\n\n'
@@ -109,14 +113,15 @@ def split_into_sections(text):
         else:
             # This is a section header
             headers.append(section)
-            #print(section)
+            # print(section)
 
     # Zip the section headers and content together
     sections = list(zip(headers, content))
 
-    #print(headers)
+    # print(headers)
 
     return sections
+
 
 def split_section_into_subsections(section_header, section_content, enc, max_tokens=3000):
     """Splits a section of text into smaller parts, each of which is returned
@@ -156,14 +161,15 @@ def split_section_into_subsections(section_header, section_content, enc, max_tok
     # Zip the subsection headers and content together
     subsections = list(zip(headers, content))
 
-
     # Split any subsections that are still too long into smaller parts
     result = []
     for header, content in subsections:
-        parts = split_subsection_into_paragraphs(header, content, enc, max_tokens)
+        parts = split_subsection_into_paragraphs(
+            header, content, enc, max_tokens)
         result.extend(parts)
 
     return result
+
 
 def split_subsection_into_parts_broken(subsection_header, subsection_content, enc, max_tokens=3000):
     # Encode the subsection content as a sequence of tokens
@@ -197,6 +203,7 @@ def split_subsection_into_parts_broken(subsection_header, subsection_content, en
 
     return parts
 
+
 def split_subsection_into_paragraphs(subsection_header, subsection_content, enc, max_tokens=3000):
     # Encode the subsection content as a sequence of tokens
     tokens = enc.encode(subsection_content)
@@ -229,6 +236,7 @@ def split_subsection_into_paragraphs(subsection_header, subsection_content, enc,
 
     return parts
 
+
 def combine_subsections(subsections):
     # Initialize the list of combined subsections
     combined_subsections = []
@@ -252,7 +260,7 @@ def combine_subsections(subsections):
             else:
                 if current_subsection_header != header:
                     current_subsection_content += "\n\n" + header + "\n"
-                #current_subsection_header += header
+                # current_subsection_header += header
 
             # Update the current combined subsection content
             current_subsection_content += content
@@ -261,7 +269,8 @@ def combine_subsections(subsections):
             current_subsection_tokens += len(tokens)
         else:
             # Add the current combined subsection to the list of combined subsections
-            combined_subsections.append((current_subsection_header, current_subsection_content))
+            combined_subsections.append(
+                (current_subsection_header, current_subsection_content))
 
             # Reset the current combined subsection
             current_subsection_header = header
@@ -269,13 +278,15 @@ def combine_subsections(subsections):
             current_subsection_tokens = len(tokens)
 
     # Add the final combined subsection to the list of combined subsections
-    combined_subsections.append((current_subsection_header, current_subsection_content))
+    combined_subsections.append(
+        (current_subsection_header, current_subsection_content))
 
     return combined_subsections
 
+
 def generate_summary(content, prompt, model_engine="text-davinci-003", max_tokens=3000):
     # Get the API key from the environment variable
-    api_key = os.environ["OPENAI_API_KEY"]
+    api_key = os.getenv("GPT_SECRET_KEY")
     openai.api_key = api_key
 
     # Set the model to use, if not specified
@@ -304,20 +315,22 @@ def generate_summary(content, prompt, model_engine="text-davinci-003", max_token
 
     return summary
 
+
 def extract_text_from_html(html_path):
     # Read the HTML file
     with open(html_path, "r") as html_file:
         html = html_file.read()
-    
+
     # Extract the text from the HTML
     text = html2text.html2text(html)
-    
+
     return text
+
 
 def create_html_file(basename, url):
     # Create the HTML file
     html_file = open(basename + ".summary.html", "w")
-    
+
     # Strip the path from the basename to get the filename
     filename = os.path.basename(basename)
 
@@ -325,20 +338,21 @@ def create_html_file(basename, url):
     html_file.write("<html>\n")
     html_file.write("<head>\n")
     html_file.write("<title>" + filename + "</title>\n")
-    #html_file.write("<link rel='stylesheet' type='text/css' href='style.css'>\n")
+    # html_file.write("<link rel='stylesheet' type='text/css' href='style.css'>\n")
     html_file.write("</head>\n")
     html_file.write("<body>\n")
     html_file.write("<article id='" + filename + "'>\n")
-    #html_file.write("<h1>" + filename + "</h1>\n")
-    html_file.write("<h1>" + "<a href='" + url + "'>" + filename + "</h1></a>\n")
-    
+    # html_file.write("<h1>" + filename + "</h1>\n")
+    html_file.write("<h1>" + "<a href='" + url +
+                    "'>" + filename + "</h1></a>\n")
+
     # Write the overall summary section
     html_file.write("<h2>Overall Summary</h2>\n")
     overall_summary_file = open(basename + ".overall_summary.txt", "r")
     overall_summary_content = overall_summary_file.read()
     html_file.write("<p>" + overall_summary_content + "</p>\n")
     overall_summary_file.close()
-    
+
     # Write the subsection summary section
     html_file.write("<h2>Subsection Summary</h2>\n")
     subsection_summary_files = glob.glob(basename + ".*.summary.txt")
@@ -348,17 +362,18 @@ def create_html_file(basename, url):
         subsection_summary_content = subsection_summary_file_handle.read()
         html_file.write("<p>" + subsection_summary_content + "</p>\n")
         subsection_summary_file_handle.close()
-    
+
     # Write the HTML footer
     html_file.write("<a href='" + url + "'>Original URL</a>\n")
     html_file.write("</article>\n")
     html_file.write("</body>\n")
     html_file.write("</html>\n")
-    
+
     # Print a message indicating that the HTML file was created
     print("Created HTML file: " + basename + ".summary.html")
     # Close the HTML file
     html_file.close()
+
 
 def download_html(url):
     # Strip any trailing /'s from the end of the URL
@@ -378,19 +393,19 @@ def download_html(url):
 
     return html_path
 
+
 if __name__ == '__main__':
-    
     model_engine = "text-davinci-003"
     max_tokens = 3000
-    doctype=""
+    doctype = ""
     # get the base filename of the first argument without the extension
     base_name = os.path.splitext(sys.argv[1])[0]
-    
+
     # If the command line argument starts with http, use curl to download it to an HTML file
     if sys.argv[1].startswith("http"):
         # Get the URL from the command line arguments
         url = sys.argv[1]
-        doctype="article"
+        doctype = "article"
 
         # Strip any query parameters from the URL
         url = url.split("?")[0]
@@ -414,7 +429,7 @@ if __name__ == '__main__':
     elif sys.argv[1].endswith(".pdf"):
         # Get the PDF file path from the command line arguments
         pdf_path = sys.argv[1]
-        doctype="paper"
+        doctype = "paper"
 
         # Extract the text from the PDF file
         text = extract_text_from_pdf(pdf_path)
@@ -422,7 +437,7 @@ if __name__ == '__main__':
 
         # Get the HTML file path from the command line arguments
         html_path = sys.argv[1]
-        doctype="article"
+        doctype = "article"
 
         # Extract the text from the HTML file
         text = extract_text_from_html(html_path)
@@ -437,7 +452,8 @@ if __name__ == '__main__':
     # Checking if output language is set: if not, leave off any language instructions from the prompt
     try:
         arg = sys.argv[2]
-        output_language_prompt = " Please use "+sys.argv[2]+" language for the output."
+        output_language_prompt = " Please use " + \
+            sys.argv[2]+" language for the output."
     except IndexError:
         output_language_prompt = ""
 
@@ -445,20 +461,20 @@ if __name__ == '__main__':
     sections = split_into_sections(text)
 
     # encode the text as a sequence of tokens
-    #enc = tiktoken.get_encoding("gpt2")
+    # enc = tiktoken.get_encoding("gpt2")
     enc = GPT2TokenizerFast.from_pretrained("gpt2")
 
     tokens = enc.encode(text)
 
     # Get the base name of the output file
-    #base_name, _ = os.path.splitext(pdf_path)
+    # base_name, _ = os.path.splitext(pdf_path)
 
     # Write the extracted text to the output file
     with open(base_name + ".full.txt", 'w') as f:
         f.write(text)
 
-    print(f"Text extracted from {sys.argv[1]} and written to {base_name}.full.txt")
-
+    print(
+        f"Text extracted from {sys.argv[1]} and written to {base_name}.full.txt")
 
     print(f"Total token count: {len(tokens)}")
 
@@ -484,21 +500,22 @@ if __name__ == '__main__':
             # Use tiktoken to encode the subsection content as a sequence of tokens
             subcontent_tokens = enc.encode(subcontent)
 
-
             # Get the name of the output file
-            #print("Subheader: ",subheader)
-            section_name = re.sub(r'[^a-zA-Z0-9]', '', subheader.replace('/','-'))
-            
-            #print("Section name: ",section_name)
+            # print("Subheader: ",subheader)
+            section_name = re.sub(r'[^a-zA-Z0-9]', '',
+                                  subheader.replace('/', '-'))
+
+            # print("Section name: ",section_name)
             output_path = f"{base_name}.{section_name}.full.txt"
 
             if (len(subcontent) == 0):
-                subheader_count = subheader_count - 1            
+                subheader_count = subheader_count - 1
             else:
                 # Write the content to the output file
                 with open(output_path, 'w') as f:
                     f.write(subcontent)
-                print(f"{subheader} ({len(subcontent)} characters, {len(subcontent_tokens)} tokens) written to {output_path}")
+                print(
+                    f"{subheader} ({len(subcontent)} characters, {len(subcontent_tokens)} tokens) written to {output_path}")
                 # Get the name of the summary file
                 summary_path = f"{base_name}.{section_name}.summary.txt"
                 # If the summary file does not exist, generate a summary
@@ -508,22 +525,25 @@ if __name__ == '__main__':
                     # Set the prompt for the summary
                     prompt = f"Please provide a detailed summary of the following section, but if the section content is mostly website context/description, just return 'Section has no content':\n{subcontent}\nPlease provide a detailed summary of the section above. If the section content is mostly website context/description, just return 'Section has no content'.{output_language_prompt}"
                     # Generate a summary for the subsection
-                    summary = generate_summary(subcontent, prompt, model_engine, max_tokens)
+                    summary = generate_summary(
+                        subcontent, prompt, model_engine, max_tokens)
                     # Write the summary to a summary file
                     with open(summary_path, 'w') as f:
                         f.write(summary)
                     print(f"Summary written to {summary_path}")
-        
+
         # If there is more than one summary file matching {base_name}.*{section_number}.summary.txt, generate a combined section summary
         section_number = section_name.split('.')[0]
         if len(glob.glob(f"{base_name}.{section_number}.*.summary.txt")) < 1:
             print(f"No summary files found for section {section_number}")
         elif len(glob.glob(f"{base_name}.{section_number}.*.summary.txt")) == 1:
 
-            print(f"Only one summary file found for section {section_number}, promoting it to section summary")
+            print(
+                f"Only one summary file found for section {section_number}, promoting it to section summary")
             # Get the path of the summary file
-            #print(glob.glob(f"{base_name}.{section_number}.*.summary.txt"))
-            summary_path = glob.glob(f"{base_name}.{section_number}.*.summary.txt")[0]
+            # print(glob.glob(f"{base_name}.{section_number}.*.summary.txt"))
+            summary_path = glob.glob(
+                f"{base_name}.{section_number}.*.summary.txt")[0]
             # Get the path of the section summary file
             section_summary_path = f"{base_name}.{section_name}.section_summary.txt"
             # Read the summary file and write it to the section summary file
@@ -532,16 +552,18 @@ if __name__ == '__main__':
             with open(section_summary_path, 'w') as f:
                 f.write(summary)
 
-            print(f"Summary promoted to section summary at {section_summary_path}")
+            print(
+                f"Summary promoted to section summary at {section_summary_path}")
 
         else:
             # Read in the section summaries
             summaries = []
-            
+
             summary_pattern = f"{base_name}.*{section_number}.summary.txt"
             print(f"Reading summary from {summary_pattern}")
             summary_paths = glob.glob(summary_pattern)
-            summary_paths.sort(key=os.path.getmtime)  # sort file names by modification time, oldest first
+            # sort file names by modification time, oldest first
+            summary_paths.sort(key=os.path.getmtime)
             for summary_path in summary_paths:
                 print(f"Reading summary from {summary_path}")
                 with open(summary_path, 'r') as f:
@@ -550,12 +572,14 @@ if __name__ == '__main__':
             subcontent = "\n\n".join(summaries)
             # Tokenize the concatenated summaries
             subcontent_tokens = enc.encode(subcontent)
-            print(f"Concatenated {len(summaries)} summaries into a single summary with {len(subcontent)} characters and {len(subcontent_tokens)} tokens")
+            print(
+                f"Concatenated {len(summaries)} summaries into a single summary with {len(subcontent)} characters and {len(subcontent_tokens)} tokens")
             if len(subcontent_tokens) == 0:
                 summary_pattern = f"{base_name}.*.summary.txt"
                 print(f"Reading summary from {summary_pattern}")
                 summary_paths = glob.glob(summary_pattern)
-                summary_paths.sort(key=os.path.getmtime)  # sort file names by modification time, oldest first
+                # sort file names by modification time, oldest first
+                summary_paths.sort(key=os.path.getmtime)
 
                 summaries = []
                 subcontent_tokens = []
@@ -572,7 +596,8 @@ if __name__ == '__main__':
                 subcontent = "\n\n".join(summaries)
                 # Tokenize the concatenated summaries
                 subcontent_tokens = enc.encode(subcontent)
-                print(f"Concatenated {len(summaries)} out of {len(summary_paths)} section summaries into a single summary with {len(subcontent)} characters and {len(subcontent_tokens)} tokens")
+                print(
+                    f"Concatenated {len(summaries)} out of {len(summary_paths)} section summaries into a single summary with {len(subcontent)} characters and {len(subcontent_tokens)} tokens")
 
             # Set the prompt for the overall section summary
             prompt = f"Please provide a detailed summary of the following sections:\n{subcontent}\nPlease provide a detailed summary of the sections above.{output_language_prompt}"
@@ -580,18 +605,18 @@ if __name__ == '__main__':
             section_summary_path = f"{base_name}.{section_number}.section_summary.txt"
             # If the overall section summary file does not exist, generate a summary
             if os.path.exists(section_summary_path):
-                print(f"Overall section summary already exists at {section_summary_path}")
+                print(
+                    f"Overall section summary already exists at {section_summary_path}")
             else:
                 # Generate the overall section summary
-                section_summary = generate_summary(content, prompt, model_engine, max_tokens)
+                section_summary = generate_summary(
+                    content, prompt, model_engine, max_tokens)
                 # Write the overall section summary to a file
                 with open(section_summary_path, 'w') as f:
                     f.write(section_summary)
-                print(f"Overall section summary written to {section_summary_path}")
+                print(
+                    f"Overall section summary written to {section_summary_path}")
 
-
-
-            
     # Check if the overall summary file already exists
     overall_summary_path = f"{base_name}.overall_summary.txt"
     if os.path.exists(overall_summary_path):
@@ -599,7 +624,8 @@ if __name__ == '__main__':
     else:
         # Read in the abstract, if it exists
         try:
-            abstract_filename=glob.glob(f"{base_name}.Title-Abstract*.full.txt")[0]
+            abstract_filename = glob.glob(
+                f"{base_name}.Title-Abstract*.full.txt")[0]
             with open(f"{abstract_filename}", 'r') as f:
                 abstract = f.read()
         except IndexError:
@@ -618,13 +644,16 @@ if __name__ == '__main__':
         for summary in summaries:
             summary_tokens = enc.encode(summary)
             if len(subcontent_tokens) + len(summary_tokens) > max_tokens:
-                print(f"Exceeded {max_tokens} tokens, stopping concatenation of summaries")
+                print(
+                    f"Exceeded {max_tokens} tokens, stopping concatenation of summaries")
                 break
             subcontent += summary + "\n\n"
             subcontent_tokens += summary_tokens
-        print(f"Concatenated {len(summaries)} summaries into a single summary with {len(subcontent)} characters and {len(subcontent_tokens)} tokens")
+        print(
+            f"Concatenated {len(summaries)} summaries into a single summary with {len(subcontent)} characters and {len(subcontent_tokens)} tokens")
         if len(subcontent_tokens) < 500:
-            print(f"Concatenated subsection summaries have less than 500 tokens, reading in all summaries")
+            print(
+                f"Concatenated subsection summaries have less than 500 tokens, reading in all summaries")
             summary_pattern = f"{base_name}.*.summary.txt"
             for summary_path in glob.glob(summary_pattern):
                 with open(summary_path, 'r') as f:
@@ -632,16 +661,17 @@ if __name__ == '__main__':
             for summary in summaries:
                 summary_tokens = enc.encode(summary)
                 if len(subcontent_tokens) + len(summary_tokens) > max_tokens:
-                    print(f"Exceeded {max_tokens} tokens, stopping concatenation of summaries")
+                    print(
+                        f"Exceeded {max_tokens} tokens, stopping concatenation of summaries")
                     break
                 subcontent += summary + "\n\n"
                 subcontent_tokens += summary_tokens
 
-
         # Set the prompt for the overall summary
         prompt = f"Please provide a detailed summary of the following {doctype}, based on its abstract and summaries of each section:\n{subcontent}\nPlease provide a detailed summary of the {doctype} described above, based on the provided abstract/introduction and summaries of each section.{output_language_prompt}"
         # Generate the overall summary
-        overall_summary = generate_summary(subcontent, prompt, model_engine, max_tokens)
+        overall_summary = generate_summary(
+            subcontent, prompt, model_engine, max_tokens)
         # Append a newline to the overall summary
         overall_summary += "\n"
         # Write the overall summary to a file

@@ -1,0 +1,50 @@
+import os
+import threading
+import openai
+from queue import Queue
+from dotenv import load_dotenv
+
+
+load_dotenv()  # This will load the environment variables from the .env file
+
+
+class CLIInterface:
+    def __init__(self):
+        self.running = True
+        openai.api_key = os.getenv('GPT_SECRET_KEY')
+        self.queue = Queue()
+        self.queue_lock = threading.Lock()
+
+    @staticmethod
+    def build():
+        # create local file if it doesn't already exist
+        if not os.path.exists("stream.txt"):
+            f = open("stream.txt", "w")
+            f.write('')
+            f.close()
+        return CLIInterface()
+
+    def openai_logic(self):
+        while self.running:
+            # Check for commands on the queue
+            with self.queue_lock:
+                if not self.queue.empty():
+                    command = self.queue.get()
+                    if command == "stop":
+                        break
+            # Do openai processing logic here
+            ...
+            should_continue = input('Continue? (y/n): ')
+            if should_continue == 'n':
+                break
+
+    def start(self):
+        openai_thread = threading.Thread(target=self.openai_logic)
+        openai_thread.start()
+        while self.running:
+            command = input("Enter a command: ")
+            with self.queue_lock:
+                self.queue.put(command)
+            if command == "stop":
+                self.running = False
+                print("Exiting CLI Interface...")
